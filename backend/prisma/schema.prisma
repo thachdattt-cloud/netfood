@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(CUSTOMER)
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Table {
+  id       Int     @id @default(autoincrement())
+  number   Int     @unique
+  qrCode   String?
+  isActive Boolean @default(true)
+  orders   Order[]
+}
+
+model Category {
+  id    Int        @id @default(autoincrement())
+  name  String
+  slug  String     @unique
+  image String?
+  items MenuItem[]
+}
+
+model MenuItem {
+  id          Int         @id @default(autoincrement())
+  name        String
+  slug        String      @unique
+  description String?
+  price       Decimal
+  image       String?
+  isAvailable Boolean     @default(true)
+  category    Category    @relation(fields: [categoryId], references: [id])
+  categoryId  Int
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  user      User?       @relation(fields: [userId], references: [id])
+  userId    Int?
+  table     Table       @relation(fields: [tableId], references: [id])
+  tableId   Int
+  status    OrderStatus @default(PENDING)
+  note      String?
+  total     Decimal
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  order      Order    @relation(fields: [orderId], references: [id])
+  orderId    Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  menuItemId Int
+  quantity   Int
+  price      Decimal
+  note       String?
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  KITCHEN
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
