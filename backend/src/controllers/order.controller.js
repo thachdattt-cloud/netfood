@@ -82,6 +82,7 @@ exports.getMyOrders = async (req, res) => {
 }
 
 exports.updateStatus = async (req, res) => {
+ console.log('👤 User:', req.user)
   try {
     const { status } = req.body
     const order = await prisma.order.update({

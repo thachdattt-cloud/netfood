@@ -6,9 +6,10 @@ const { kitchenOrAdmin, staffOrAdmin } = require('../middlewares/role.middleware
 const { validate } = require('../middlewares/validate.middleware')
 const { createOrderSchema } = require('../validators/order.validator')
 
+
 router.post('/', validate(createOrderSchema), createOrder)           // Public (scan QR không cần login)
 router.get('/', protect, kitchenOrAdmin, getOrders)                  // Kitchen + Admin
 router.get('/my', protect, getMyOrders)                              // Customer đã login
-router.patch('/:id/status', protect, staffOrAdmin, updateStatus)    // Staff + Admin
+router.patch('/:id/status', protect, kitchenOrAdmin, updateStatus)   // Staff + Admin
 
 module.exports = router

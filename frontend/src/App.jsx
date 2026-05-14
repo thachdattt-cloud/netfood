@@ -7,11 +7,13 @@ import MenuPage from './pages/MenuPage'
 import CartPage from './pages/CartPage'
 import LoginPage from './pages/LoginPage'
 import KitchenPage from './pages/kitchen/KitchenPage'
+import StaffPage from './pages/staff/StaffPage'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminMenuPage from './pages/admin/AdminMenuPage'
 import AdminOrdersPage from './pages/admin/AdminOrdersPage'
 import AdminTablesPage from './pages/admin/AdminTablesPage'
 import AdminStatsPage from './pages/admin/AdminStatsPage'
+import AdminUsersPage from './pages/admin/AdminUsersPage'
 import OrderSuccessPage from './pages/OrderSuccessPage'
 
 const ProtectedRoute = ({ roles }) => {
@@ -21,7 +23,6 @@ const ProtectedRoute = ({ roles }) => {
   return <Outlet />
 }
 
-// Layout cho admin (có sidebar, không có navbar)
 const AdminLayout = () => (
   <div style={{ display: 'flex' }}>
     <AdminSidebar />
@@ -31,7 +32,6 @@ const AdminLayout = () => (
   </div>
 )
 
-// Layout cho user thường (có navbar)
 const UserLayout = () => (
   <>
     <Navbar />
@@ -47,29 +47,27 @@ export default function App() {
         success: { iconTheme: { primary: '#22c55e', secondary: '#f0f0f0' } },
         error: { iconTheme: { primary: '#ef4444', secondary: '#f0f0f0' } }
       }} />
-
       <Routes>
-        {/* User routes */}
         <Route element={<UserLayout />}>
           <Route path="/" element={<Navigate to="/menu" />} />
           <Route path="/menu" element={<MenuPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/order-success" element={<OrderSuccessPage />} />
-
-          {/* Kitchen */}
-          <Route element={<ProtectedRoute roles={['ADMIN', 'KITCHEN', 'STAFF']} />}>
+          <Route element={<ProtectedRoute roles={['ADMIN', 'KITCHEN']} />}>
             <Route path="/kitchen" element={<KitchenPage />} />
           </Route>
+          <Route element={<ProtectedRoute roles={['ADMIN', 'STAFF']} />}>
+            <Route path="/staff" element={<StaffPage />} />
+          </Route>
         </Route>
-
-        {/* Admin routes — có sidebar riêng */}
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/menu" element={<AdminMenuPage />} />
             <Route path="/admin/orders" element={<AdminOrdersPage />} />
             <Route path="/admin/tables" element={<AdminTablesPage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/stats" element={<AdminStatsPage />} />
           </Route>
         </Route>

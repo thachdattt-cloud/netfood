@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react'
-import { getOrders, updateOrderStatus } from '../../services/order.service'
+import { getOrders } from '../../services/order.service'
 import socket from '../../services/socket'
 import toast from 'react-hot-toast'
 
 const STATUS_LABELS = {
-  PENDING: { label: 'Chờ xác nhận', color: '#eab308', bg: '#2a2000' },
-  CONFIRMED: { label: 'Đã xác nhận', color: '#38bdf8', bg: '#001a2a' },
-  PREPARING: { label: 'Đang làm', color: '#ff6b2b', bg: '#1a0d00' },
-  READY: { label: 'Sẵn sàng', color: '#22c55e', bg: '#002a10' },
-  DELIVERED: { label: 'Đã giao', color: '#888', bg: '#1a1a1a' },
-  CANCELLED: { label: 'Đã huỷ', color: '#ef4444', bg: '#2a0000' }
+  PENDING:   { label: 'Chờ xác nhận', color: '#eab308', bg: '#2a2000' },
+  CONFIRMED: { label: 'Đã xác nhận',  color: '#38bdf8', bg: '#001a2a' },
+  PREPARING: { label: 'Đang làm',     color: '#ff6b2b', bg: '#1a0d00' },
+  READY:     { label: 'Sẵn sàng',     color: '#22c55e', bg: '#002a10' },
+  DELIVERED: { label: 'Đã giao',      color: '#888',    bg: '#1a1a1a' },
+  CANCELLED: { label: 'Đã huỷ',       color: '#ef4444', bg: '#2a0000' }
 }
 
 export default function AdminOrdersPage() {
@@ -21,28 +21,26 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     fetchOrders()
     socket.emit('join_kitchen')
+
     socket.on('new_order', (order) => {
       setOrders(prev => [order, ...prev])
       toast('🆕 Đơn mới từ máy ' + order.table?.number, { icon: '🔔' })
     })
-    return () => socket.off('new_order')
+
+    socket.on('order_status_updated', ({ orderId, status }) => {
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
+      if (selected?.id === orderId) setSelected(prev => ({ ...prev, status }))
+    })
+
+    return () => { socket.off('new_order'); socket.off('order_status_updated') }
   }, [])
 
   const fetchOrders = async () => {
     try {
-      const res = await getOrders({ limit: 100 })
+      const res = await getOrders({ limit: 200 })
       setOrders(res.data.data)
     } catch { toast.error('Không tải được đơn hàng') }
     finally { setLoading(false) }
-  }
-
-  const handleStatus = async (id, status) => {
-    try {
-      await updateOrderStatus(id, status)
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
-      if (selected?.id === id) setSelected(prev => ({ ...prev, status }))
-      toast.success('Cập nhật thành công!')
-    } catch { toast.error('Cập nhật thất bại') }
   }
 
   const filtered = filter === 'ALL' ? orders : orders.filter(o => o.status === filter)
@@ -52,7 +50,7 @@ export default function AdminOrdersPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 28, fontWeight: 800 }}>📋 Quản lý Đơn hàng</h1>
-          <p style={{ color: '#888', marginTop: 4 }}>{orders.length} đơn hàng</p>
+          <p style={{ color: '#888', marginTop: 4 }}>Theo dõi toàn bộ đơn hàng — chỉ đọc</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}></span>
@@ -73,13 +71,13 @@ export default function AdminOrdersPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 20 }}>
-        {/* Orders table */}
+      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 360px' : '1fr', gap: 20 }}>
+        {/* Bảng đơn hàng — admin chỉ xem, không có dropdown đổi trạng thái */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2a2a2a', background: '#141414' }}>
-                {['#', 'Máy', 'Món', 'Tổng tiền', 'Trạng thái', 'Thời gian', 'Thao tác'].map(h => (
+                {['#', 'Máy', 'Món', 'Tổng tiền', 'Trạng thái', 'Thời gian'].map(h => (
                   <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#888', fontWeight: 500 }}>{h}</th>
                 ))}
               </tr>
@@ -90,7 +88,7 @@ export default function AdminOrdersPage() {
                 return (
                   <tr key={order.id}
                     style={{ borderBottom: '1px solid #1e1e1e', cursor: 'pointer', background: selected?.id === order.id ? '#1a0d00' : 'transparent' }}
-                    onClick={() => setSelected(order)}
+                    onClick={() => setSelected(order === selected ? null : order)}
                     onMouseEnter={e => { if (selected?.id !== order.id) e.currentTarget.style.background = '#141414' }}
                     onMouseLeave={e => { if (selected?.id !== order.id) e.currentTarget.style.background = 'transparent' }}>
                     <td style={{ padding: '12px 14px', color: '#888' }}>#{order.id}</td>
@@ -107,14 +105,6 @@ export default function AdminOrdersPage() {
                     <td style={{ padding: '12px 14px', color: '#666', fontSize: 12 }}>
                       {new Date(order.createdAt).toLocaleTimeString('vi-VN')}
                     </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <select value={order.status}
-                        onChange={e => { e.stopPropagation(); handleStatus(order.id, e.target.value) }}
-                        onClick={e => e.stopPropagation()}
-                        style={{ fontSize: 12, padding: '4px 8px', width: 'auto' }}>
-                        {Object.keys(STATUS_LABELS).map(s => <option key={s} value={s}>{STATUS_LABELS[s].label}</option>)}
-                      </select>
-                    </td>
                   </tr>
                 )
               })}
@@ -125,11 +115,11 @@ export default function AdminOrdersPage() {
           )}
         </div>
 
-        {/* Order detail panel */}
+        {/* Chi tiết đơn */}
         {selected && (
           <div className="card" style={{ alignSelf: 'start', position: 'sticky', top: 80 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-              <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700 }}>Chi tiết #{ selected.id}</h3>
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700 }}>Chi tiết #{selected.id}</h3>
               <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             <div style={{ marginBottom: 16, padding: '10px 14px', background: '#1e1e1e', borderRadius: 8 }}>
@@ -155,13 +145,13 @@ export default function AdminOrdersPage() {
                 📝 {selected.note}
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid #2a2a2a', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid #2a2a2a' }}>
               <span style={{ fontWeight: 600 }}>Tổng cộng</span>
               <span style={{ fontWeight: 800, color: '#ff6b2b', fontSize: 18 }}>
                 {Number(selected.total).toLocaleString('vi-VN')}đ
               </span>
             </div>
-            <p style={{ fontSize: 12, color: '#555' }}>{new Date(selected.createdAt).toLocaleString('vi-VN')}</p>
+            <p style={{ fontSize: 12, color: '#555', marginTop: 12 }}>{new Date(selected.createdAt).toLocaleString('vi-VN')}</p>
           </div>
         )}
       </div>
