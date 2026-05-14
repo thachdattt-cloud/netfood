@@ -1,19 +1,20 @@
 const prisma = require('../config/db')
 const { success, error, paginated } = require('../utils/response.util')
 const { getPagination } = require('../utils/pagination.util')
+const orderService = require('../services/order.service')
 
 exports.createOrder = async (req, res) => {
   try {
     const { tableId, note, items } = req.body
 
-    // Tính tổng tiền
-    const menuItems = await prisma.menuItem.findMany({
-      where: { id: { in: items.map(i => i.menuItemId) } }
-    })
-    const total = items.reduce((sum, item) => {
-      const menuItem = menuItems.find(m => m.id === item.menuItemId)
-      return sum + (menuItem?.price || 0) * item.quantity
-    }, 0)
+    // Dùng service kiểm tra món còn hàng
+    const { menuItems, unavailable } = await orderService.checkAvailability(items)
+    if (unavailable.length > 0) {
+      return error(res, `Một số món đã hết hàng: ${unavailable.map(u => u.name).join(', ')}`, 400)
+    }
+
+    // Dùng service tính tổng tiền
+    const total = orderService.calculateTotal(items, menuItems)
 
     const order = await prisma.order.create({
       data: {
@@ -24,19 +25,13 @@ exports.createOrder = async (req, res) => {
         items: {
           create: items.map(item => {
             const menuItem = menuItems.find(m => m.id === item.menuItemId)
-            return {
-              menuItemId: item.menuItemId,
-              quantity: item.quantity,
-              note: item.note,
-              price: menuItem.price
-            }
+            return { menuItemId: item.menuItemId, quantity: item.quantity, note: item.note, price: menuItem.price }
           })
         }
       },
       include: { items: { include: { menuItem: true } }, table: true }
     })
 
-    // Emit socket event để bếp nhận ngay
     const io = req.app.get('io')
     io.to('kitchen').emit('new_order', order)
 
@@ -82,7 +77,6 @@ exports.getMyOrders = async (req, res) => {
 }
 
 exports.updateStatus = async (req, res) => {
- console.log('👤 User:', req.user)
   try {
     const { status } = req.body
     const order = await prisma.order.update({
@@ -91,11 +85,21 @@ exports.updateStatus = async (req, res) => {
       include: { items: { include: { menuItem: true } }, table: true }
     })
 
-    // Emit socket event cập nhật status realtime
     const io = req.app.get('io')
     io.emit('order_status_updated', { orderId: order.id, status: order.status, tableId: order.tableId })
 
     return success(res, order, 'Cập nhật trạng thái thành công')
+  } catch (err) {
+    return error(res, err.message)
+  }
+}
+
+// Thống kê ngày hôm nay dùng service
+exports.getDailyStats = async (req, res) => {
+  try {
+    const date = req.query.date ? new Date(req.query.date) : new Date()
+    const stats = await orderService.getDailyStats(date)
+    return success(res, stats)
   } catch (err) {
     return error(res, err.message)
   }

@@ -10,6 +10,7 @@ const links = [
   { to: '/admin/stats',  label: 'Thống kê',        icon: '📈' },
   { to: '/kitchen',      label: 'Màn hình Bếp',   icon: '👨‍🍳' },
   { to: '/staff',        label: 'Màn hình NV',     icon: '🛎️' },
+  { to: '/menu', label: 'Giao diện User', icon: '👁️' },
 ]
 
 export default function AdminSidebar() {
